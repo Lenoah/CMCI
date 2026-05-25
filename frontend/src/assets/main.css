@@ -1,0 +1,93 @@
+/* ═══════════════════════════════════════════════════════════
+   Styles globaux CMCI — variables CSS définies dans CLAUDE.md
+   Tous les composants doivent utiliser ces variables.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Variables CSS ─────────────────────────────────────────── */
+:root {
+  /* Couleurs principales */
+  --primary:       #1e3a5f;  /* Bleu foncé — sidebar, boutons principaux */
+  --primary-light: #2d5a8e;  /* Bleu moyen — hover */
+  --primary-dark:  #152a45;  /* Bleu très foncé — header sidebar */
+
+  /* Fonds et surfaces */
+  --bg-page:    #f8f9fa;  /* Fond de page gris très clair */
+  --bg-card:    #ffffff;  /* Cartes et conteneurs */
+  --bg-sidebar: #1e3a5f;  /* Sidebar */
+
+  /* Texte */
+  --text-primary:   #1a1a2e;  /* Titres et texte principal */
+  --text-secondary: #6b7280;  /* Labels, texte secondaire */
+  --text-light:     #9ca3af;  /* Placeholders, hints */
+  --text-white:     #ffffff;  /* Texte sur fond foncé */
+
+  /* États */
+  --success: #10b981;  /* Vert — confirmations, statut actif */
+  --warning: #f59e0b;  /* Orange — en attente */
+  --danger:  #ef4444;  /* Rouge — erreurs, suppressions */
+  --info:    #3b82f6;  /* Bleu — informations */
+
+  /* Bordures et ombres */
+  --border:     #e5e7eb;
+  --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md:  0 4px 6px rgba(0, 0, 0, 0.07);
+  --shadow-lg:  0 10px 25px rgba(0, 0, 0, 0.1);
+
+  /* Espacement (multiples de 4px) */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-2xl: 48px;
+
+  /* Typographie */
+  --font-family:    "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-size-sm:   0.875rem;  /* 14px — secondaire */
+  --font-size-base: 1rem;      /* 16px — courant */
+  --font-size-lg:   1.125rem;  /* 18px — sous-titres */
+  --font-size-xl:   1.5rem;    /* 24px — titres de page */
+  --font-size-2xl:  2rem;      /* 32px — chiffres dashboard */
+
+  /* Arrondis */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Transitions */
+  --transition: all 0.2s ease;
+}
+
+/* ── Reset ─────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+body {
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  font-size: var(--font-size-base);
+  line-height: 1.6;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ── Scrollbar discrète ────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #f1f1f1; }
+::-webkit-scrollbar-thumb  { background: #c7c7c7; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a0a0a0; }

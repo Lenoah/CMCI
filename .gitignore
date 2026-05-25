@@ -1,0 +1,76 @@
+# ===================================================================
+# .gitignore — Système de Gestion CMCI
+# Tout ce qui est listé ici NE sera PAS envoyé lors d'un commit.
+# But : ne versionner que le code source, jamais les dépendances,
+# les secrets, les fichiers générés ni les fichiers personnels.
+# ===================================================================
+
+# --- Dépendances (réinstallables avec "npm install") ---
+node_modules/
+**/node_modules/
+.pnp
+.pnp.js
+
+# --- Secrets et variables d'environnement ---
+# .env contient le mot de passe de la base : NE JAMAIS le committer.
+# On garde uniquement .env.example comme modèle (voir l'exception plus bas).
+.env
+.env.*
+**/.env
+**/.env.*
+
+# --- Fichiers de build / production (générés par Vite) ---
+dist/
+dist-ssr/
+**/dist/
+build/
+*.local
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Cache des outils (Vite, ESLint, etc.) ---
+.vite/
+.cache/
+.eslintcache
+*.tsbuildinfo
+
+# --- Fichiers et dossiers d'éditeurs / IDE ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# --- Fichiers système d'exploitation ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Fichiers liés à Claude (assistant IA) ---
+# On ne versionne ni les instructions ni la configuration de Claude.
+CLAUDE.md
+**/CLAUDE.md
+.claude/
+**/.claude/
+
+# --- Fichiers parasites créés par erreur dans frontend/ ---
+# (fichiers vides issus d'une commande shell ratée)
+node
+cmci-backend@1.0.0
+
+# ===================================================================
+# EXCEPTIONS : fichiers que l'on GARDE malgré les règles ci-dessus
+# Le "!" annule l'exclusion pour ce fichier précis.
+# ===================================================================
+!.env.example
+!**/.env.example
