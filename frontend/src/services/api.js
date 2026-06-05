@@ -9,13 +9,18 @@ const api = axios.create({
   },
 });
 
-// Intercepteur de réponse : si le serveur répond 401 (token invalide),
-// on redirige vers la page de connexion
+// Intercepteur de réponse : si le serveur répond 401 (token expiré/invalide),
+// on efface la session persistée et on redirige vers la connexion.
+// Exception : on ignore l'échec de /auth/login pour laisser le formulaire
+// afficher son propre message d'erreur (sans recharger la page).
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Redirection vers /login sans utiliser le store (évite la dépendance circulaire)
+    const url = error.config?.url || '';
+    if (error.response?.status === 401 && !url.includes('/auth/login')) {
+      // Nettoyage direct du sessionStorage (évite la dépendance circulaire au store)
+      sessionStorage.removeItem('cmci_token');
+      sessionStorage.removeItem('cmci_user');
       window.location.href = '/login';
     }
     return Promise.reject(error);

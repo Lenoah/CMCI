@@ -31,13 +31,20 @@
             <input v-model="form.dateHeureFin" type="datetime-local" />
           </div>
         </div>
-        <div class="form-group">
+        <!-- Église : un Leader la choisit dans sa zone ; pour un Dirigeant
+             elle est automatique (sa propre église), donc pas de sélecteur. -->
+        <div v-if="auth.estLeader" class="form-group">
           <label>Église *</label>
           <select v-model.number="form.idEglise" required>
             <option v-for="e in eglises" :key="e.idEglise" :value="e.idEglise">
               {{ e.nomEglise }} — {{ e.ville }}
             </option>
           </select>
+        </div>
+        <div v-else-if="egliseAuto" class="form-group">
+          <label>Église</label>
+          <input type="text" :value="egliseAuto.nomEglise" disabled class="champ-lecture" />
+          <span class="aide-champ">Votre réunion sera organisée dans votre église.</span>
         </div>
 
         <div class="form-actions">
@@ -55,22 +62,35 @@
 import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useReunionsStore } from '@/stores/reunions';
+import { useAuthStore } from '@/stores/auth';
 import api from '@/services/api';
 import AlertMessage from '@/components/common/AlertMessage.vue';
 
 const router = useRouter();
 const store = useReunionsStore();
+const auth = useAuthStore();
 const erreur = ref('');
 const succes = ref('');
 const loading = ref(false);
-const eglises = ref([]);
+const eglises = ref([]);      // liste des églises (cas Leader)
+const egliseAuto = ref(null); // église imposée (cas Dirigeant)
 
 const form = reactive({ typeReunion: 'Culte', dateHeureDebut: '', dateHeureFin: '', idEglise: null });
 
-// Charger la liste des églises pour le sélecteur
 onMounted(async () => {
-  const { data } = await api.get('/eglises');
-  eglises.value = data;
+  if (auth.estLeader) {
+    // Un Leader choisit l'église parmi celles de sa zone
+    const { data } = await api.get('/eglises');
+    eglises.value = data;
+  } else {
+    // Un Dirigeant organise toujours dans SA propre église : on la récupère
+    // et on la fixe automatiquement (le serveur revérifie ce rattachement).
+    const { data } = await api.get('/dashboard/dirigeant');
+    if (data.eglise) {
+      egliseAuto.value = data.eglise;
+      form.idEglise = data.eglise.idEglise;
+    }
+  }
 });
 
 async function sauvegarder() {
@@ -99,6 +119,8 @@ async function sauvegarder() {
 .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
 .form-group label { font-size: var(--font-size-sm); font-weight: 500; color: var(--text-primary); }
 .form-group input, .form-group select { padding: 0.55rem 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; outline: none; }
+.champ-lecture { background: var(--bg-page); color: var(--text-secondary); }
+.aide-champ { font-size: 0.78rem; color: var(--text-light); }
 .form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.5rem; }
 .btn-annuler { padding: 0.55rem 1rem; border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-sm); font-size: var(--font-size-sm); text-decoration: none; color: var(--text-primary); }
 .btn-sauvegarder { padding: 0.55rem 1.25rem; background: var(--primary); color: var(--text-white); border: none; border-radius: var(--radius-sm); font-size: var(--font-size-sm); font-weight: 600; cursor: pointer; }

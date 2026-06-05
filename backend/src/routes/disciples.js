@@ -2,9 +2,13 @@
 const router = require('express').Router();
 const auth = require('../middlewares/auth');
 const { requireRole } = require('../middlewares/auth');
-const { getAll, getById, update, remove } = require('../controllers/disciples');
+const { create, getAll, getById, update, remove } = require('../controllers/disciples');
 
 const LEADERS = ['LeaderNat', 'LeaderReg', 'LeaderMon'];
+
+// Création : seul un Dirigeant inscrit un membre dans son église
+// (église + rôle 'Disciple' forcés dans le controller). Pas d'inscription publique.
+router.post('/', auth, requireRole('Dirigeant'), create);
 
 // Lecture : visibilité réelle filtrée dans le controller selon le rôle
 router.get('/', auth, getAll);

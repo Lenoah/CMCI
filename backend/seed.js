@@ -1,205 +1,219 @@
-// Script de données de test (seed) pour la base de données CMCI
+// Script de données de test (seed) pour la base de données CMCI.
+//
+// Objectif : un jeu de données GÉOGRAPHIQUEMENT COHÉRENT.
+//   Monde ─► Région (sous-région) ─► Pays ─► Église (ville) ─► Disciples
+//
+//   • Un disciple appartient à une église : il hérite du pays ET de la région de cette église.
+//     (Impossible d'avoir un disciple « Belgique » dans une église de Paris.)
+//   • Un Leader National ne couvre que SON pays.
+//   • Un Leader Régional ne couvre que SA région (plusieurs pays).
+//   • Le Leader Mondial voit tout.
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const {
   sequelize, Disciple, EgliseDeMaison, Reunion, RoutineSpirituelle,
-  ContenuSpirituel, Traduction, ValidationAvancement, Presence,
+  ContenuSpirituel, Traduction, ValidationAvancement, Presence, Consultation,
 } = require('./src/models');
 
 // Raccourci pour hasher un mot de passe
 const hash = (pwd) => bcrypt.hashSync(pwd, 10);
+const MDP = hash('password123'); // tous les comptes de test partagent ce mot de passe
+
+// Dates relatives à aujourd'hui : le seed reste « frais » à chaque exécution
+const jour = (decalage) => {
+  const d = new Date();
+  d.setDate(d.getDate() + decalage);
+  return d;
+};
+const jourISO = (decalage) => jour(decalage).toISOString().slice(0, 10);
+const dateHeure = (decalage, heure) => {
+  const d = jour(decalage);
+  d.setHours(heure, 0, 0, 0);
+  return d;
+};
+
+// Crée une église complète : son dirigeant, l'église, puis ses membres.
+// Le dirigeant et les membres héritent automatiquement du pays et de la région
+// de l'église → cohérence géographique garantie.
+async function creerEglise(def) {
+  const dirigeant = await Disciple.create({
+    ...def.dirigeant, role: 'Dirigeant', statut: 'Actif',
+    pays: def.pays, region: def.region,
+  });
+
+  const eglise = await EgliseDeMaison.create({
+    nomEglise: def.nomEglise, ville: def.ville, pays: def.pays, region: def.region,
+    capaciteMax: 30, statutEglise: 'Active', idDirigeant: dirigeant.idDisciple,
+  });
+
+  await dirigeant.update({ idEglise: eglise.idEglise });
+
+  const membres = [];
+  for (const m of def.membres) {
+    membres.push(await Disciple.create({
+      ...m, role: 'Disciple', statut: 'Actif',
+      pays: def.pays, region: def.region, idEglise: eglise.idEglise,
+    }));
+  }
+  console.log(`  Église « ${def.nomEglise} » (${def.ville}, ${def.pays}) : 1 dirigeant + ${membres.length} disciples`);
+  return { dirigeant, eglise, membres };
+}
 
 async function seed() {
   try {
     await sequelize.authenticate();
-    await sequelize.sync({ force: true }); // force: supprime et recrée les tables proprement
+    await sequelize.sync({ force: true }); // supprime et recrée les tables proprement
     console.log('Base synchronisée. Insertion des données...\n');
 
-    // ── 1. Créer le leader national ──────────────────────────────
-    const [leaderNat] = await Disciple.findOrCreate({
-      where: { telephone: '0600000000' },
-      defaults: {
-        nom: 'Mbarga', prenom: 'Samuel',
-        telephone: '0600000000',
-        motDePasse: hash('password123'),
-        pays: 'Cameroun',
-        role: 'LeaderNat',
-        zoneCouverture: 'Afrique Centrale',
-        niveauFormation: 5,
-        statut: 'Actif',
-      },
-    });
-    console.log(`Leader National : ${leaderNat.prenom} ${leaderNat.nom}`);
-
-    // ── 2. Créer le dirigeant ────────────────────────────────────
-    const [dirigeant] = await Disciple.findOrCreate({
-      where: { telephone: '0600000001' },
-      defaults: {
-        nom: 'Dupont', prenom: 'Jean',
-        telephone: '0600000001',
-        motDePasse: hash('password123'),
-        pays: 'France',
-        role: 'Dirigeant',
-        niveauFormation: 3,
-        statut: 'Actif',
-      },
-    });
-    console.log(`Dirigeant : ${dirigeant.prenom} ${dirigeant.nom}`);
-
-    // ── 3. Créer l'église de maison ──────────────────────────────
-    const [eglise] = await EgliseDeMaison.findOrCreate({
-      where: { nomEglise: 'Église de la Grâce' },
-      defaults: {
-        nomEglise: 'Église de la Grâce',
-        ville: 'Paris',
-        pays: 'France',
-        capaciteMax: 30,
-        statutEglise: 'Active',
-        idDirigeant: dirigeant.idDisciple,
-      },
-    });
-    console.log(`Église : ${eglise.nomEglise}`);
-
-    // Associer le dirigeant à son église
-    await dirigeant.update({ idEglise: eglise.idEglise });
-
-    // ── 4. Trois disciples ───────────────────────────────────────
-    const [disciple1] = await Disciple.findOrCreate({
-      where: { telephone: '0600000002' },
-      defaults: {
-        nom: 'Martin', prenom: 'Marie',
-        telephone: '0600000002',
-        motDePasse: hash('password123'),
-        pays: 'France', role: 'Disciple',
-        niveauFormation: 1, statut: 'Actif',
-        idEglise: eglise.idEglise,
-      },
+    // ── 1. Églises avec dirigeants et disciples (cohérents) ──────
+    const yaounde = await creerEglise({
+      nomEglise: 'Source de Vie', ville: 'Yaoundé', pays: 'Cameroun', region: 'Afrique Centrale',
+      dirigeant: { nom: 'Awono', prenom: 'Pierre', telephone: '0611000000', motDePasse: MDP, niveauFormation: 3 },
+      membres: [
+        { nom: 'Mballa', prenom: 'Grace', telephone: '0611000001', motDePasse: MDP, niveauFormation: 1 },
+        { nom: 'Fouda', prenom: 'Joseph', telephone: '0611000002', motDePasse: MDP, niveauFormation: 2 },
+        { nom: 'Atangana', prenom: 'Ruth', telephone: '0611000003', motDePasse: MDP, niveauFormation: 1 },
+      ],
     });
 
-    const [disciple2] = await Disciple.findOrCreate({
-      where: { telephone: '0600000003' },
-      defaults: {
-        nom: 'Leblanc', prenom: 'Paul',
-        telephone: '0600000003',
-        motDePasse: hash('password123'),
-        pays: 'Belgique', role: 'Disciple',
-        niveauFormation: 2, statut: 'Actif',
-        idEglise: eglise.idEglise,
-      },
+    const libreville = await creerEglise({
+      nomEglise: 'Bethel', ville: 'Libreville', pays: 'Gabon', region: 'Afrique Centrale',
+      dirigeant: { nom: 'Nguema', prenom: 'Jean', telephone: '0612000000', motDePasse: MDP, niveauFormation: 3 },
+      membres: [
+        { nom: 'Obame', prenom: 'Esther', telephone: '0612000001', motDePasse: MDP, niveauFormation: 1 },
+        { nom: 'Ndong', prenom: 'Marc', telephone: '0612000002', motDePasse: MDP, niveauFormation: 2 },
+      ],
     });
 
-    const [disciple3] = await Disciple.findOrCreate({
-      where: { telephone: '0600000004' },
-      defaults: {
-        nom: 'Nguema', prenom: 'Esther',
-        telephone: '0600000004',
-        motDePasse: hash('password123'),
-        pays: 'Gabon', role: 'Disciple',
-        niveauFormation: 1, statut: 'Actif',
-        idEglise: eglise.idEglise,
-      },
+    const paris = await creerEglise({
+      nomEglise: 'La Grâce', ville: 'Paris', pays: 'France', region: 'Europe de l\'Ouest',
+      dirigeant: { nom: 'Dupont', prenom: 'Jean', telephone: '0613000000', motDePasse: MDP, niveauFormation: 3 },
+      membres: [
+        { nom: 'Martin', prenom: 'Marie', telephone: '0613000001', motDePasse: MDP, niveauFormation: 1 },
+        { nom: 'Bernard', prenom: 'Luc', telephone: '0613000002', motDePasse: MDP, niveauFormation: 2 },
+      ],
     });
-    console.log(`3 disciples créés.`);
+    console.log('');
 
-    // ── 5. Routines spirituelles ─────────────────────────────────
+    // ── 2. Leaders de la hiérarchie ──────────────────────────────
+    // Règle métier : un leader est un disciple rattaché à une église locale.
+    // Il hérite donc du pays et de la région de son église. La zoneCouverture
+    // indique l'étendue qu'il supervise (monde / sa région / son pays).
+    const leader = (def) => Disciple.create({
+      ...def.compte, motDePasse: MDP, statut: 'Actif', niveauFormation: 5,
+      idEglise: def.eglise.eglise.idEglise,
+      pays: def.eglise.eglise.pays, region: def.eglise.eglise.region,
+    });
+
+    // Leader Mondial (membre de l'église de Yaoundé) — supervise le monde
+    await leader({ eglise: yaounde, compte: {
+      nom: 'Mbarga', prenom: 'David', telephone: '0600000000', role: 'LeaderMon', zoneCouverture: 'Monde' } });
+
+    // Leaders Régionaux — zoneCouverture = leur région (déduite de leur église)
+    await leader({ eglise: yaounde, compte: {
+      nom: 'Eboué', prenom: 'Samuel', telephone: '0600000010', role: 'LeaderReg', zoneCouverture: 'Afrique Centrale' } });
+    await leader({ eglise: paris, compte: {
+      nom: 'Robert', prenom: 'Pauline', telephone: '0600000011', role: 'LeaderReg', zoneCouverture: 'Europe de l\'Ouest' } });
+
+    // Leaders Nationaux — couvrent le pays de leur église
+    const leaderNatCmr = await leader({ eglise: yaounde, compte: {
+      nom: 'Ondoa', prenom: 'Esther', telephone: '0600000020', role: 'LeaderNat', zoneCouverture: 'Cameroun' } });
+    await leader({ eglise: libreville, compte: {
+      nom: 'Bivigou', prenom: 'Paul', telephone: '0600000021', role: 'LeaderNat', zoneCouverture: 'Gabon' } });
+    await leader({ eglise: paris, compte: {
+      nom: 'Moreau', prenom: 'Claire', telephone: '0600000022', role: 'LeaderNat', zoneCouverture: 'France' } });
+
+    // Responsable des contenus (membre de Yaoundé)
+    const respContenus = await leader({ eglise: yaounde, compte: {
+      nom: 'Kana', prenom: 'Bertha', telephone: '0600000030', role: 'RespContenus', zoneCouverture: null } });
+    console.log('Leaders créés : 1 mondial, 2 régionaux, 3 nationaux, 1 resp. contenus\n');
+
+    // ── 3. Activité de démonstration (église de Yaoundé) ─────────
+    const dirigeant = yaounde.dirigeant;
+    const [m1, m2, m3] = yaounde.membres;
+
+    // Routines spirituelles réparties sur la semaine
     const routines = [
-      { typeRoutine: 'Lecture', dateRoutine: '2026-04-20', dureeMinutes: 30, notes: 'Jean 3', idDisciple: disciple1.idDisciple },
-      { typeRoutine: 'PriereSeule', dateRoutine: '2026-04-20', dureeMinutes: 20, notes: 'Intercession', idDisciple: disciple1.idDisciple },
-      { typeRoutine: 'Meditation', dateRoutine: '2026-04-19', dureeMinutes: 15, notes: 'Psaume 23', idDisciple: disciple2.idDisciple },
-      { typeRoutine: 'Lecture', dateRoutine: '2026-04-18', dureeMinutes: 45, notes: 'Romains 8', idDisciple: disciple2.idDisciple },
-      { typeRoutine: 'Jeune', dateRoutine: '2026-04-17', dureeMinutes: null, notes: 'Jeûne du matin', idDisciple: disciple1.idDisciple },
+      { typeRoutine: 'Lecture', dateRoutine: jourISO(0), dureeMinutes: 30, notes: 'Jean 3', idDisciple: m1.idDisciple },
+      { typeRoutine: 'PriereSeule', dateRoutine: jourISO(0), dureeMinutes: 20, notes: 'Intercession', idDisciple: m1.idDisciple },
+      { typeRoutine: 'Meditation', dateRoutine: jourISO(-1), dureeMinutes: 15, notes: 'Psaume 23', idDisciple: m1.idDisciple },
+      { typeRoutine: 'Jeune', dateRoutine: jourISO(-2), dureeMinutes: null, notes: 'Jeûne du matin', idDisciple: m1.idDisciple },
+      { typeRoutine: 'Lecture', dateRoutine: jourISO(0), dureeMinutes: 45, notes: 'Romains 8', idDisciple: m2.idDisciple },
+      { typeRoutine: 'Meditation', dateRoutine: jourISO(-1), dureeMinutes: 25, notes: 'Béatitudes', idDisciple: m2.idDisciple },
+      { typeRoutine: 'PriereSeule', dateRoutine: jourISO(-1), dureeMinutes: 15, notes: 'Action de grâce', idDisciple: m3.idDisciple },
     ];
-    for (const r of routines) {
-      await RoutineSpirituelle.findOrCreate({ where: r, defaults: r });
-    }
-    console.log(`5 routines spirituelles créées.`);
+    for (const r of routines) await RoutineSpirituelle.create(r);
+    console.log(`${routines.length} routines spirituelles créées.`);
 
-    // ── 6. Réunions ──────────────────────────────────────────────
-    const [reunion1] = await Reunion.findOrCreate({
-      where: { typeReunion: 'Culte', idEglise: eglise.idEglise, idOrganisateur: dirigeant.idDisciple },
-      defaults: {
-        typeReunion: 'Culte',
-        dateHeureDebut: new Date('2026-04-27T10:00:00'),
-        dateHeureFin: new Date('2026-04-27T12:00:00'),
-        statutReunion: 'Planifiee',
-        idEglise: eglise.idEglise,
-        idOrganisateur: dirigeant.idDisciple,
-      },
+    // Réunions (le dirigeant organise dans son église)
+    const reunion1 = await Reunion.create({
+      typeReunion: 'Culte', dateHeureDebut: dateHeure(3, 10), dateHeureFin: dateHeure(3, 12),
+      statutReunion: 'Planifiee', idEglise: yaounde.eglise.idEglise, idOrganisateur: dirigeant.idDisciple,
     });
-
-    const [reunion2] = await Reunion.findOrCreate({
-      where: { typeReunion: 'EtudeBiblique', idEglise: eglise.idEglise, idOrganisateur: dirigeant.idDisciple },
-      defaults: {
-        typeReunion: 'EtudeBiblique',
-        dateHeureDebut: new Date('2026-04-15T18:00:00'),
-        dateHeureFin: new Date('2026-04-15T19:30:00'),
-        statutReunion: 'Terminee',
-        idEglise: eglise.idEglise,
-        idOrganisateur: dirigeant.idDisciple,
-      },
+    const reunion2 = await Reunion.create({
+      typeReunion: 'EtudeBiblique', dateHeureDebut: dateHeure(-2, 18), dateHeureFin: dateHeure(-2, 20),
+      statutReunion: 'Terminee', idEglise: yaounde.eglise.idEglise, idOrganisateur: dirigeant.idDisciple,
     });
-    console.log(`2 réunions créées.`);
-
-    // Présences pour la réunion 2
-    await Presence.findOrCreate({ where: { idReunion: reunion2.idReunion, idDisciple: disciple1.idDisciple }, defaults: { present: true } });
-    await Presence.findOrCreate({ where: { idReunion: reunion2.idReunion, idDisciple: disciple2.idDisciple }, defaults: { present: false } });
-
-    // ── 7. Contenus spirituels ───────────────────────────────────
-    const [contenu1] = await ContenuSpirituel.findOrCreate({
-      where: { titreContenu: 'Introduction à la foi chrétienne' },
-      defaults: {
-        titreContenu: 'Introduction à la foi chrétienne',
-        langueOriginale: 'Français',
-        datePublication: new Date('2026-04-01'),
-        idPublieur: leaderNat.idDisciple,
-      },
+    await Reunion.create({
+      typeReunion: 'Priere', dateHeureDebut: dateHeure(6, 19), dateHeureFin: dateHeure(6, 20),
+      statutReunion: 'Planifiee', idEglise: yaounde.eglise.idEglise, idOrganisateur: dirigeant.idDisciple,
     });
+    console.log('3 réunions créées.');
 
-    const [contenu2] = await ContenuSpirituel.findOrCreate({
-      where: { titreContenu: 'Le disciple et la prière' },
-      defaults: {
-        titreContenu: 'Le disciple et la prière',
-        langueOriginale: 'Français',
-        datePublication: new Date('2026-04-10'),
-        idPublieur: leaderNat.idDisciple,
-      },
-    });
-    console.log(`2 contenus spirituels créés.`);
+    // Présences pour la réunion terminée
+    await Presence.create({ idReunion: reunion2.idReunion, idDisciple: m1.idDisciple, present: true });
+    await Presence.create({ idReunion: reunion2.idReunion, idDisciple: m2.idDisciple, present: true });
+    await Presence.create({ idReunion: reunion2.idReunion, idDisciple: m3.idDisciple, present: false });
 
-    // ── 8. Traduction ────────────────────────────────────────────
-    await Traduction.findOrCreate({
-      where: { idContenu: contenu1.idContenu, langueCible: 'Anglais' },
-      defaults: {
-        idContenu: contenu1.idContenu,
-        langueCible: 'Anglais',
-        titreTraduit: 'Introduction to Christian Faith',
-        idTraducteur: dirigeant.idDisciple,
-      },
+    // Contenus spirituels (publiés par le responsable des contenus)
+    const contenu1 = await ContenuSpirituel.create({
+      titreContenu: 'Introduction à la foi chrétienne', langueOriginale: 'Français',
+      datePublication: jour(-30), idPublieur: respContenus.idDisciple,
     });
-    console.log(`1 traduction créée.`);
+    const contenu2 = await ContenuSpirituel.create({
+      titreContenu: 'Le disciple et la prière', langueOriginale: 'Français',
+      datePublication: jour(-10), idPublieur: respContenus.idDisciple,
+    });
+    console.log('2 contenus spirituels créés.');
 
-    // ── 9. Validation d'avancement ───────────────────────────────
-    await ValidationAvancement.findOrCreate({
-      where: { idDisciple: disciple2.idDisciple, niveauDemande: 3 },
-      defaults: {
-        idDisciple: disciple2.idDisciple,
-        niveauDemande: 3,
-        idEvaluateur: dirigeant.idDisciple,
-        statutDirigeant: 'EnAttente',
-        statutLeader: 'EnAttente',
-        statutFinal: 'EnAttente',
-      },
+    // Consultations
+    await Consultation.create({ idDisciple: m1.idDisciple, idContenu: contenu1.idContenu, dateLecture: jour(-5) });
+    await Consultation.create({ idDisciple: m1.idDisciple, idContenu: contenu2.idContenu, dateLecture: jour(-1) });
+    await Consultation.create({ idDisciple: m2.idDisciple, idContenu: contenu1.idContenu, dateLecture: jour(-3) });
+
+    // Traduction
+    await Traduction.create({
+      idContenu: contenu1.idContenu, langueCible: 'Anglais',
+      titreTraduit: 'Introduction to Christian Faith', idTraducteur: respContenus.idDisciple,
     });
-    console.log(`1 demande d'avancement créée.`);
+    console.log('1 traduction créée.');
+
+    // Validations d'avancement (double validation : dirigeant puis leader)
+    await ValidationAvancement.create({
+      idDisciple: m2.idDisciple, niveauDemande: 3, idEvaluateur: dirigeant.idDisciple,
+      idLeader: leaderNatCmr.idDisciple,
+      statutDirigeant: 'EnAttente', statutLeader: 'EnAttente', statutFinal: 'EnAttente',
+    });
+    await ValidationAvancement.create({
+      idDisciple: m1.idDisciple, niveauDemande: 2, idEvaluateur: dirigeant.idDisciple,
+      idLeader: leaderNatCmr.idDisciple,
+      statutDirigeant: 'Approuve', statutLeader: 'EnAttente', statutFinal: 'EnAttente',
+    });
+    console.log('2 demandes d\'avancement créées.');
 
     // ── Résumé des comptes de test ───────────────────────────────
     console.log('\n══════════════════════════════════════════════');
-    console.log('Seed terminé ! Comptes de test :');
-    console.log('  Leader     : 0600000000 / password123');
-    console.log('  Dirigeant  : 0600000001 / password123');
-    console.log('  Disciple 1 : 0600000002 / password123');
-    console.log('  Disciple 2 : 0600000003 / password123');
-    console.log('  Disciple 3 : 0600000004 / password123');
+    console.log('Seed terminé ! Comptes de test (mot de passe : password123) :');
+    console.log('  Leader Mondial          : 0600000000');
+    console.log('  Leader Régional AfrCent : 0600000010');
+    console.log('  Leader Régional Europe  : 0600000011');
+    console.log('  Leader National Cameroun: 0600000020');
+    console.log('  Leader National Gabon   : 0600000021');
+    console.log('  Leader National France  : 0600000022');
+    console.log('  Resp. Contenus          : 0600000030');
+    console.log('  Dirigeant Yaoundé       : 0611000000  (membres 0611000001..3)');
+    console.log('  Dirigeant Libreville    : 0612000000  (membres 0612000001..2)');
+    console.log('  Dirigeant Paris         : 0613000000  (membres 0613000001..2)');
     console.log('══════════════════════════════════════════════');
 
     process.exit(0);

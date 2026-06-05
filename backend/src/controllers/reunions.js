@@ -1,13 +1,45 @@
 // Contrôleur pour la gestion des réunions
 const { Reunion, EgliseDeMaison, Disciple, Presence } = require('../models');
 
-// GET /api/reunions — liste des réunions
+// Renvoie la liste des id d'églises visibles par l'utilisateur connecté,
+// ou `null` pour « toutes » (Leader Mondial). Respecte la hiérarchie :
+// Mondial → tout · Régional → sa région · National → son pays · sinon → son église.
+async function eglisesEnPortee(req) {
+  const role = req.user.role;
+  if (role === 'LeaderMon') return null; // aucune restriction
+
+  let where;
+  if (role === 'LeaderNat') {
+    const moi = await Disciple.findByPk(req.user.id, { attributes: ['pays'] });
+    where = { pays: moi?.pays || '__aucun__' };
+  } else if (role === 'LeaderReg') {
+    const moi = await Disciple.findByPk(req.user.id, { attributes: ['zoneCouverture'] });
+    where = { region: moi?.zoneCouverture || '__aucune__' };
+  } else if (role === 'Dirigeant') {
+    const eglise = await EgliseDeMaison.findOne({ where: { idDirigeant: req.user.id } });
+    return eglise ? [eglise.idEglise] : [-1];
+  } else {
+    // Disciple / RespContenus : uniquement les réunions de SON église
+    const moi = await Disciple.findByPk(req.user.id, { attributes: ['idEglise'] });
+    return moi?.idEglise ? [moi.idEglise] : [-1];
+  }
+
+  const eglises = await EgliseDeMaison.findAll({ where, attributes: ['idEglise'] });
+  return eglises.map((e) => e.idEglise);
+}
+
+// GET /api/reunions — réunions visibles selon le rôle (cloisonnement géographique)
 async function getAll(req, res) {
   try {
-    const where = {};
+    const portee = await eglisesEnPortee(req);
+    const where = portee === null ? {} : { idEglise: portee };
+
     if (req.query.type) where.typeReunion = req.query.type;
     if (req.query.statut) where.statutReunion = req.query.statut;
-    if (req.query.eglise_id) where.idEglise = req.query.eglise_id;
+    // Un filtre église explicite ne peut pas élargir le périmètre autorisé
+    if (req.query.eglise_id && (portee === null || portee.includes(Number(req.query.eglise_id)))) {
+      where.idEglise = req.query.eglise_id;
+    }
 
     const reunions = await Reunion.findAll({
       where,
@@ -40,6 +72,13 @@ async function getById(req, res) {
       ],
     });
     if (!reunion) return res.status(404).json({ message: 'Réunion introuvable' });
+
+    // Cloisonnement : on n'autorise la consultation que dans son périmètre
+    const portee = await eglisesEnPortee(req);
+    if (portee !== null && !portee.includes(reunion.idEglise)) {
+      return res.status(403).json({ message: 'Cette réunion n\'est pas dans votre périmètre' });
+    }
+
     res.json(reunion);
   } catch (err) {
     console.error('Erreur getById reunion:', err);

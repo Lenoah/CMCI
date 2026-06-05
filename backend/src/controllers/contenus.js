@@ -131,4 +131,18 @@ async function consulter(req, res) {
   }
 }
 
-module.exports = { getAll, getById, create, update, consulter };
+// DELETE /api/contenus/:id — supprimer un contenu (RespContenus uniquement, vu en route)
+async function remove(req, res) {
+  try {
+    const contenu = await ContenuSpirituel.findByPk(req.params.id);
+    if (!contenu)
+      return res.status(404).json({ message: "Contenu introuvable" });
+    await contenu.destroy();
+    res.json({ message: "Contenu supprimé avec succès" });
+  } catch (err) {
+    console.error("Erreur remove contenu:", err);
+    res.status(500).json({ message: "Erreur interne" });
+  }
+}
+
+module.exports = { getAll, getById, create, update, consulter, remove };

@@ -16,7 +16,13 @@ const Disciple = sequelize.define(
     prenom: { type: DataTypes.STRING(100), allowNull: false },
     telephone: { type: DataTypes.STRING(20), allowNull: false, unique: true },
     motDePasse: { type: DataTypes.STRING(255), allowNull: false },
+    // Photo de profil stockée en data URL base64 (image redimensionnée côté client).
+    // MEDIUMTEXT car une data URL dépasse la taille d'un VARCHAR/TEXT classique.
+    photoUrl: { type: DataTypes.TEXT('medium'), allowNull: true },
     pays: { type: DataTypes.STRING(100) },
+    // Sous-région d'appartenance (ex : « Afrique Centrale »).
+    // Permet à un Leader Régional de ne voir que les disciples de sa région.
+    region: { type: DataTypes.STRING(100), allowNull: true },
     role: {
       type: DataTypes.ENUM(
         'Disciple',
@@ -58,6 +64,9 @@ const EgliseDeMaison = sequelize.define(
     nomEglise: { type: DataTypes.STRING(150), allowNull: false },
     ville: { type: DataTypes.STRING(100) },
     pays: { type: DataTypes.STRING(100) },
+    // Sous-région de l'église (ex : « Afrique Centrale ») — utilisée par le
+    // cloisonnement des Leaders Régionaux qui ne voient que les églises de leur région.
+    region: { type: DataTypes.STRING(100), allowNull: true },
     capaciteMax: { type: DataTypes.INTEGER },
     statutEglise: {
       type: DataTypes.ENUM('Active', 'Inactive', 'Fermee'),
@@ -269,8 +278,9 @@ EgliseDeMaison.belongsTo(Disciple, {
   as: 'dirigeant',
   foreignKey: 'idDirigeant',
 });
-Disciple.hasMany(EgliseDeMaison, {
-  as: 'eglisesDirigees',
+// Règle métier : un dirigeant dirige UNE SEULE église de maison (hasOne)
+Disciple.hasOne(EgliseDeMaison, {
+  as: 'egliseDirigee',
   foreignKey: 'idDirigeant',
 });
 

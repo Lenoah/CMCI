@@ -2,7 +2,7 @@
 const { Op } = require('sequelize');
 const {
   Disciple, EgliseDeMaison, Reunion, RoutineSpirituelle,
-  ValidationAvancement, ContenuSpirituel, Consultation, Presence,
+  ValidationAvancement, Consultation,
 } = require('../models');
 
 // Calcule le début de la semaine actuelle (lundi)
@@ -35,7 +35,7 @@ async function disciple(req, res) {
     });
 
     const moi = await Disciple.findByPk(idDisciple, {
-      attributes: ['niveauFormation', 'role', 'statut'],
+      attributes: ['niveauFormation', 'role', 'statut', 'idEglise'],
     });
 
     const dernieresRoutines = await RoutineSpirituelle.findAll({
@@ -44,8 +44,10 @@ async function disciple(req, res) {
       limit: 5,
     });
 
+    // Réunions à venir de SON église uniquement (cloisonnement)
     const prochainesReunions = await Reunion.findAll({
       where: {
+        idEglise: moi?.idEglise || -1,
         dateHeureDebut: { [Op.gte]: new Date() },
         statutReunion: 'Planifiee',
       },
@@ -113,11 +115,25 @@ async function dirigeant(req, res) {
   }
 }
 
-// GET /api/dashboard/leader — stats globales pour le leader
+// GET /api/dashboard/leader — stats pour le leader, cloisonnées selon son périmètre
+// LeaderMon : monde entier · LeaderNat : son pays · LeaderReg : sa région.
 async function leader(req, res) {
   try {
-    const totalDisciples = await Disciple.count({ where: { statut: 'Actif' } });
-    const totalEglises = await EgliseDeMaison.count({ where: { statutEglise: 'Active' } });
+    // On construit un filtre géographique commun aux disciples et aux églises
+    const filtreDisciple = { statut: 'Actif' };
+    const filtreEglise = { statutEglise: 'Active' };
+    if (req.user.role === 'LeaderNat') {
+      const moi = await Disciple.findByPk(req.user.id, { attributes: ['pays'] });
+      filtreDisciple.pays = moi?.pays || '__aucun__';
+      filtreEglise.pays = moi?.pays || '__aucun__';
+    } else if (req.user.role === 'LeaderReg') {
+      const moi = await Disciple.findByPk(req.user.id, { attributes: ['zoneCouverture'] });
+      filtreDisciple.region = moi?.zoneCouverture || '__aucune__';
+      filtreEglise.region = moi?.zoneCouverture || '__aucune__';
+    }
+
+    const totalDisciples = await Disciple.count({ where: filtreDisciple });
+    const totalEglises = await EgliseDeMaison.count({ where: filtreEglise });
     const totalReunions = await Reunion.count({
       where: { dateHeureDebut: { [Op.gte]: debutMois() } },
     });
@@ -125,10 +141,10 @@ async function leader(req, res) {
       where: { statutDirigeant: 'Approuve', statutLeader: 'EnAttente' },
     });
 
-    // Répartition des disciples par pays
+    // Répartition des disciples par pays (sur le même périmètre)
     const parPays = await Disciple.findAll({
       attributes: ['pays', [require('sequelize').fn('COUNT', require('sequelize').col('id_disciple')), 'total']],
-      where: { statut: 'Actif' },
+      where: filtreDisciple,
       group: ['pays'],
       raw: true,
     });

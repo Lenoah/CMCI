@@ -11,12 +11,6 @@ const routes = [
     component: () => import('@/views/auth/LoginView.vue'),
     meta: { guest: true },
   },
-  {
-    path: '/register',
-    name: 'Register',
-    component: () => import('@/views/auth/RegisterView.vue'),
-    meta: { guest: true },
-  },
 
   // ── Pages protégées (connecté) — toutes utilisent AppLayout ───
   {
@@ -27,11 +21,14 @@ const routes = [
       // Dashboard (s'adapte selon le rôle)
       { path: 'dashboard', name: 'Dashboard', component: () => import('@/views/DashboardView.vue') },
 
+      // Mon Profil — accessible à tous les rôles (infos, photo, mot de passe)
+      { path: 'profil', name: 'Profil', component: () => import('@/views/profile/ProfileView.vue') },
+
       // Disciples
       { path: 'disciples', name: 'Disciples', component: () => import('@/views/disciples/DisciplesList.vue') },
       { path: 'disciples/nouveau', name: 'DiscipleNouv',
         component: () => import('@/views/disciples/DiscipleForm.vue'),
-        meta: { roles: ['Dirigeant', 'LeaderNat', 'LeaderReg', 'LeaderMon'] } },
+        meta: { roles: ['Dirigeant'] } },
       { path: 'disciples/:id', name: 'DiscipleDetail', component: () => import('@/views/disciples/DiscipleDetail.vue') },
       { path: 'disciples/:id/modifier', name: 'DiscipleModif',
         component: () => import('@/views/disciples/DiscipleForm.vue'),
@@ -41,11 +38,11 @@ const routes = [
       { path: 'eglises', name: 'Eglises', component: () => import('@/views/eglises/EglisesList.vue') },
       { path: 'eglises/nouvelle', name: 'EgliseNouvelle',
         component: () => import('@/views/eglises/EgliseForm.vue'),
-        meta: { roles: ['LeaderNat', 'LeaderReg', 'LeaderMon'] } },
+        meta: { roles: ['LeaderMon'] } },
       { path: 'eglises/:id', name: 'EgliseDetail', component: () => import('@/views/eglises/EgliseDetail.vue') },
       { path: 'eglises/:id/modifier', name: 'EgliseModif',
         component: () => import('@/views/eglises/EgliseForm.vue'),
-        meta: { roles: ['LeaderNat', 'LeaderReg', 'LeaderMon'] } },
+        meta: { roles: ['LeaderMon'] } },
 
       // Réunions — création réservée aux Dirigeants
       { path: 'reunions', name: 'Reunions', component: () => import('@/views/reunions/ReunionsList.vue') },
@@ -59,6 +56,10 @@ const routes = [
 
       // Routines spirituelles — chaque disciple gère les siennes
       { path: 'routines', name: 'Routines', component: () => import('@/views/routines/RoutinesList.vue') },
+      // Suivi des routines des disciples (responsables uniquement)
+      { path: 'routines/suivi', name: 'SuiviRoutines',
+        component: () => import('@/views/routines/SuiviRoutines.vue'),
+        meta: { roles: ['Dirigeant', 'LeaderNat', 'LeaderReg', 'LeaderMon'] } },
       { path: 'routines/nouvelle', name: 'RoutineNouvelle', component: () => import('@/views/routines/RoutineForm.vue') },
       { path: 'routines/:id/modifier', name: 'RoutineModif', component: () => import('@/views/routines/RoutineForm.vue') },
 

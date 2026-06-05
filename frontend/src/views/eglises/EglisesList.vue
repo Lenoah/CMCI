@@ -5,7 +5,7 @@
       <h2 class="page-titre">Églises de maison</h2>
       <!-- Création d'une église : Leader uniquement -->
       <router-link
-        v-if="auth.estLeader"
+        v-if="auth.estLeaderMon"
         to="/app/eglises/nouvelle"
         class="btn-primary"
       >
@@ -27,12 +27,12 @@
           <router-link :to="`/app/eglises/${ligne.idEglise}`" class="btn-sm btn-voir">Voir</router-link>
           <!-- Édition / suppression : Leaders uniquement -->
           <router-link
-            v-if="auth.estLeader"
+            v-if="auth.estLeaderMon"
             :to="`/app/eglises/${ligne.idEglise}/modifier`"
             class="btn-sm btn-edit"
           >Éditer</router-link>
           <button
-            v-if="auth.estLeader"
+            v-if="auth.estLeaderMon"
             @click="confirmerSuppression(ligne)"
             class="btn-sm btn-del"
           >Suppr.</button>

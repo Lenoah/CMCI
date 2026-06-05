@@ -51,5 +51,11 @@ export const useContenusStore = defineStore('contenus', () => {
     return data;
   }
 
-  return { contenus, contenu, loading, erreur, fetchAll, fetchById, create, update, consulter };
+  // Supprimer un contenu (réservé au RespContenus)
+  async function remove(id) {
+    await api.delete(`/contenus/${id}`);
+    contenus.value = contenus.value.filter((c) => c.idContenu !== Number(id));
+  }
+
+  return { contenus, contenu, loading, erreur, fetchAll, fetchById, create, update, consulter, remove };
 });

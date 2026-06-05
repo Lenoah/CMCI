@@ -1,7 +1,9 @@
 <template>
   <!-- Formulaire d'inscription / modification d'un disciple
        Règles :
-       - Dirigeant peut inscrire un nouveau disciple (rôle forcé à 'Disciple')
+       - Seul un Dirigeant inscrit un nouveau disciple : le rôle ('Disciple') et
+         l'église sont imposés par le serveur ; il ne saisit que nom, prénom,
+         téléphone et un mot de passe temporaire.
        - Dirigeant peut modifier ses membres MAIS ne peut PAS changer leur rôle
        - Leader peut tout faire (y compris changer un rôle) -->
   <div>
@@ -25,48 +27,55 @@
             <input v-model="form.nom" type="text" required />
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label>Téléphone *</label>
-            <input v-model="form.telephone" type="tel" required />
-          </div>
-          <div class="form-group">
-            <label>Pays</label>
-            <input v-model="form.pays" type="text" />
-          </div>
-        </div>
-
-        <!-- En mode création, on demande le mot de passe initial -->
-        <div v-if="!estModification" class="form-group">
-          <label>Mot de passe initial *</label>
-          <input v-model="form.motDePasse" type="password" required minlength="4" />
-        </div>
-
-        <div class="form-row">
-          <!-- Le champ rôle n'est éditable que pour les Leaders ; les Dirigeants ne peuvent PAS changer un rôle -->
-          <div class="form-group">
-            <label>Rôle</label>
-            <select v-if="auth.estLeader" v-model="form.role">
-              <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
-            </select>
-            <input v-else type="text" :value="form.role" disabled class="champ-lecture" />
-            <span v-if="!auth.estLeader" class="aide-champ">
-              Seul un Leader peut changer le rôle d'un disciple.
-            </span>
-          </div>
-          <div class="form-group">
-            <label>Statut</label>
-            <select v-model="form.statut">
-              <option value="Actif">Actif</option>
-              <option value="Inactif">Inactif</option>
-              <option value="Suspendu">Suspendu</option>
-            </select>
-          </div>
-        </div>
         <div class="form-group">
-          <label>Niveau de formation</label>
-          <input v-model.number="form.niveauFormation" type="number" min="1" max="10" />
+          <label>Téléphone *</label>
+          <input v-model="form.telephone" type="tel" required />
         </div>
+
+        <!-- Création : mot de passe temporaire. L'église et le rôle 'Disciple'
+             sont attribués automatiquement par le serveur (pas de choix). -->
+        <div v-if="!estModification" class="form-group">
+          <label>Mot de passe temporaire *</label>
+          <input v-model="form.motDePasse" type="password" required minlength="4" />
+          <span class="aide-champ">
+            Le disciple sera rattaché à votre église et pourra changer ce mot de passe plus tard.
+          </span>
+        </div>
+
+        <!-- Champs réservés à la modification d'un disciple existant -->
+        <template v-if="estModification">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Pays (selon l'église)</label>
+              <input v-model="form.pays" type="text" disabled class="champ-lecture" />
+            </div>
+            <div class="form-group">
+              <label>Statut</label>
+              <select v-model="form.statut">
+                <option value="Actif">Actif</option>
+                <option value="Inactif">Inactif</option>
+                <option value="Suspendu">Suspendu</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <!-- Le rôle n'est modifiable que par le Leader Mondial -->
+            <div class="form-group">
+              <label>Rôle</label>
+              <select v-if="auth.estLeaderMon" v-model="form.role">
+                <option v-for="r in roles" :key="r" :value="r">{{ r }}</option>
+              </select>
+              <input v-else type="text" :value="form.role" disabled class="champ-lecture" />
+              <span v-if="!auth.estLeaderMon" class="aide-champ">
+                Seul le Leader Mondial peut changer le rôle d'un disciple.
+              </span>
+            </div>
+            <div class="form-group">
+              <label>Niveau de formation</label>
+              <input v-model.number="form.niveauFormation" type="number" min="1" max="10" />
+            </div>
+          </div>
+        </template>
 
         <div class="form-actions">
           <router-link to="/app/disciples" class="btn-annuler">Annuler</router-link>
@@ -84,7 +93,6 @@ import { reactive, ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useDisciplesStore } from '@/stores/disciples';
 import { useAuthStore } from '@/stores/auth';
-import api from '@/services/api';
 import AlertMessage from '@/components/common/AlertMessage.vue';
 
 const route = useRoute();
@@ -122,18 +130,33 @@ async function sauvegarder() {
   loading.value = true;
   try {
     if (estModification.value) {
-      // Si l'utilisateur n'est pas Leader, on n'envoie PAS le champ role
+      // Seul le Leader Mondial envoie le champ role ; sinon on l'omet
       const { role, ...sansRole } = form;
-      const payload = auth.estLeader ? form : sansRole;
-      await store.update(route.params.id, payload);
+      const payload = auth.estLeaderMon ? { ...form } : sansRole;
+      try {
+        await store.update(route.params.id, payload);
+      } catch (err) {
+        // Le serveur demande confirmation si le poste de leader est déjà occupé
+        const data = err.response?.data;
+        if (err.response?.status === 409 && data?.besoinConfirmation) {
+          if (window.confirm(data.message)) {
+            await store.update(route.params.id, { ...payload, remplacer: true });
+          } else {
+            loading.value = false;
+            return;
+          }
+        } else {
+          throw err;
+        }
+      }
     } else {
-      // Création : on passe par /auth/register qui force role='Disciple'
-      await api.post('/auth/register', {
+      // Création : le serveur force role='Disciple' et rattache le disciple
+      // à l'église du dirigeant connecté. On n'envoie que les 4 champs saisis.
+      await store.create({
         nom: form.nom,
         prenom: form.prenom,
         telephone: form.telephone,
         motDePasse: form.motDePasse,
-        pays: form.pays,
       });
     }
     succes.value = 'Disciple enregistré avec succès.';

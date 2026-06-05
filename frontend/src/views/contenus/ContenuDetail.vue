@@ -12,8 +12,25 @@
         >
           + Traduction
         </router-link>
+        <!-- Suppression du contenu : RespContenus uniquement, avec confirmation -->
+        <button
+          v-if="auth.estRespContenus"
+          @click="modalVisible = true"
+          class="btn-supprimer"
+        >
+          Supprimer
+        </button>
       </div>
     </div>
+
+    <!-- Modale de confirmation avant suppression -->
+    <ConfirmModal
+      :visible="modalVisible"
+      titre="Supprimer le contenu"
+      :message="`Supprimer « ${c?.titreContenu} » ? Cette action est irréversible.`"
+      @confirmer="supprimer"
+      @annuler="modalVisible = false"
+    />
 
     <LoadingSpinner v-if="store.loading" />
 
@@ -58,16 +75,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useContenusStore } from '@/stores/contenus';
 import { useAuthStore } from '@/stores/auth';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
+import ConfirmModal from '@/components/common/ConfirmModal.vue';
 
 const route = useRoute();
+const router = useRouter();
 const store = useContenusStore();
 const auth = useAuthStore();
 const c = computed(() => store.contenu);
+const modalVisible = ref(false);
 
 function formatDate(d) {
   return d ? new Date(d).toLocaleDateString('fr-FR') : '';
@@ -75,6 +95,13 @@ function formatDate(d) {
 
 async function marquerConsulte() {
   await store.consulter(route.params.id);
+}
+
+// Supprimer le contenu puis revenir à la liste
+async function supprimer() {
+  await store.remove(route.params.id);
+  modalVisible.value = false;
+  router.push('/app/contenus');
 }
 
 onMounted(() => store.fetchById(route.params.id));
@@ -85,6 +112,8 @@ onMounted(() => store.fetchById(route.params.id));
 .btn-retour { color: var(--primary); font-size: var(--font-size-sm); }
 .header-actions { display: flex; gap: 0.5rem; }
 .btn-traduction { background: var(--primary); color: var(--text-white); padding: 0.4rem 0.9rem; border-radius: var(--radius-sm); font-size: var(--font-size-sm); text-decoration: none; }
+.btn-supprimer { background: transparent; color: var(--danger); border: 1px solid var(--danger); padding: 0.4rem 0.9rem; border-radius: var(--radius-sm); font-size: var(--font-size-sm); font-weight: 500; cursor: pointer; }
+.btn-supprimer:hover { background: var(--danger); color: var(--text-white); }
 .carte { background: var(--bg-card); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: var(--space-md); box-shadow: var(--shadow-sm); }
 .titre-contenu { font-size: var(--font-size-xl); font-weight: 700; color: var(--primary); margin: 0 0 0.75rem; }
 .meta { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: var(--space-md); }

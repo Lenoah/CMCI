@@ -4,7 +4,8 @@ import { ref } from 'vue';
 import api from '@/services/api';
 
 export const useRoutinesStore = defineStore('routines', () => {
-  const routines = ref([]);
+  const routines = ref([]);   // MES routines
+  const suivi = ref([]);      // routines des disciples sous ma responsabilité
   const loading = ref(false);
   const erreur = ref('');
 
@@ -14,6 +15,20 @@ export const useRoutinesStore = defineStore('routines', () => {
     try {
       const { data } = await api.get('/routines');
       routines.value = data;
+    } catch (err) {
+      erreur.value = err.response?.data?.message || 'Erreur lors du chargement';
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  // Charge les routines des disciples placés sous la responsabilité du compte connecté
+  async function fetchSuivi() {
+    loading.value = true;
+    erreur.value = '';
+    try {
+      const { data } = await api.get('/routines/suivi');
+      suivi.value = data;
     } catch (err) {
       erreur.value = err.response?.data?.message || 'Erreur lors du chargement';
     } finally {
@@ -39,5 +54,5 @@ export const useRoutinesStore = defineStore('routines', () => {
     routines.value = routines.value.filter((r) => r.idRoutine !== id);
   }
 
-  return { routines, loading, erreur, fetchAll, create, update, remove };
+  return { routines, suivi, loading, erreur, fetchAll, fetchSuivi, create, update, remove };
 });

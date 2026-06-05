@@ -30,9 +30,14 @@ app.use((err, _req, res, _next) => {
   res.status(err.status || 500).json({ message: err.message || 'Erreur interne du serveur' });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Serveur CMCI démarré sur http://localhost:${PORT}`);
-});
+// On ne démarre le serveur HTTP qu'en exécution normale.
+// Pendant les tests (NODE_ENV=test), Supertest crée son propre serveur éphémère :
+// inutile d'écouter sur un port réel (sinon le port reste occupé entre les tests).
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Serveur CMCI démarré sur http://localhost:${PORT}`);
+  });
+}
 
 module.exports = app;

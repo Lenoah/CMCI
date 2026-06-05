@@ -17,10 +17,15 @@
     <template v-if="d">
       <!-- Informations personnelles -->
       <div class="carte">
-        <h3 class="carte-titre">{{ d.prenom }} {{ d.nom }}</h3>
+        <div class="carte-entete">
+          <img v-if="d.photoUrl" :src="d.photoUrl" alt="Photo de profil" class="avatar" />
+          <span v-else class="avatar avatar-initiales">{{ (d.prenom?.[0] || '') + (d.nom?.[0] || '') }}</span>
+          <h3 class="carte-titre">{{ d.prenom }} {{ d.nom }}</h3>
+        </div>
         <div class="info-grille">
           <div class="info-item"><span class="label">Téléphone</span><span>{{ d.telephone }}</span></div>
-          <div class="info-item"><span class="label">Pays</span><span>{{ d.pays }}</span></div>
+          <div class="info-item"><span class="label">Pays</span><span>{{ d.pays || '—' }}</span></div>
+          <div class="info-item"><span class="label">Région</span><span>{{ d.region || '—' }}</span></div>
           <div class="info-item"><span class="label">Rôle</span><span class="badge">{{ d.role }}</span></div>
           <div class="info-item"><span class="label">Niveau</span><span>{{ d.niveauFormation }}</span></div>
           <div class="info-item"><span class="label">Statut</span><span :class="`statut-${d.statut?.toLowerCase()}`">{{ d.statut }}</span></div>
@@ -77,7 +82,10 @@ onMounted(() => store.fetchById(route.params.id));
 .btn-retour { color: var(--primary); font-size: var(--font-size-sm); }
 .btn-edit { background: var(--primary); color: var(--text-white); padding: 0.4rem 0.9rem; border-radius: var(--radius-sm); font-size: var(--font-size-sm); text-decoration: none; }
 .carte { background: var(--bg-card); border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: var(--space-md); box-shadow: var(--shadow-sm); }
-.carte-titre { font-size: 1.2rem; font-weight: 700; color: var(--primary); margin: 0 0 1rem; }
+.carte-entete { display: flex; align-items: center; gap: var(--space-md); margin-bottom: 1rem; }
+.carte-titre { font-size: 1.2rem; font-weight: 700; color: var(--primary); margin: 0; }
+.avatar { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+.avatar-initiales { display: flex; align-items: center; justify-content: center; background: var(--primary); color: var(--text-white); font-size: 1.3rem; font-weight: 600; text-transform: uppercase; }
 .info-grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; }
 .info-item { display: flex; flex-direction: column; gap: 0.2rem; }
 .label { font-size: 0.75rem; color: var(--text-light); text-transform: uppercase; }
